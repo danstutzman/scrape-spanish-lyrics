@@ -1,0 +1,8 @@
+#!/bin/bash -ex
+#scrapy runspider myspider.py -s AUTOTHROTTLE_ENABLED=1 -s AUTOTHROTTLE_DEBUG=1
+mkdir -p crawls
+scrapy crawl letras_alphabet \
+  -s JOBDIR=crawls/letras_alphabet.pyc-1 \
+  -s AUTOTHROTTLE_ENABLED=1 \
+  -s AUTOTHROTTLE_DEBUG=1 \
+  -s FEED_URI=$PWD/output.txt
