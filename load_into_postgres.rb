@@ -1,8 +1,15 @@
 # encoding: UTF-8
 require 'json'
 
+class LineWord
+  attr_accessor :word
+  attr_accessor :line_id
+  attr_accessor :begin_index
+  attr_accessor :end_index
+end
+
 lines = []
-word2line_ids = {}
+word2line_words = {}
 File.open('akwid.txt') do |infile|
   infile.each_line do |json|
     object = JSON.parse(json)
@@ -13,12 +20,37 @@ File.open('akwid.txt') do |infile|
           lines.push line
           line_id = lines.size
 
-          words = line.downcase.split(/[ ,.?()!?"*:¿?\[\]¡\/]+/)
-          words.uniq.each do |word|
-            if word2line_ids[word] == nil
-              word2line_ids[word] = []
+          line_words = []
+          current_line_word = nil
+          line.chars.each_with_index do |char, i|
+            if char.match /[a-zñáéíóúü]/i
+              if current_line_word == nil
+                current_line_word = LineWord.new
+                current_line_word.line_id = line_id
+                current_line_word.begin_index = i
+                current_line_word.word = ''
+              end
+              current_line_word.word += char
+            else
+              if current_line_word
+                current_line_word.end_index = i
+                line_words.push current_line_word
+                current_line_word = nil
+              end
             end
-            word2line_ids[word].push line_id
+          end
+          if current_line_word
+            current_line_word.end_index = line.chars.size
+            line_words.push current_line_word
+            current_line_word = nil
+          end
+
+          line_words.each do |line_word|
+            word = line_word.word.downcase
+            if word2line_words[word] == nil
+              word2line_words[word] = []
+            end
+            word2line_words[word].push line_word
           end
         end
       end
@@ -27,7 +59,7 @@ File.open('akwid.txt') do |infile|
 end
 
 word2word_id = {}
-word2line_ids.keys.each_with_index do |word, word_id0|
+word2line_words.keys.each_with_index do |word, word_id0|
   word2word_id[word] = word_id0 + 1
 end
 
@@ -56,16 +88,22 @@ word2word_id.each do |word, word_id|
 end
 puts "\\."
 
-puts "DROP TABLE IF EXISTS words_lines;
-CREATE TABLE words_lines (
+puts "CREATE INDEX idx_words_word_word ON words(word);"
+
+puts "DROP TABLE IF EXISTS line_words;
+CREATE TABLE line_words (
+  line_id int not null,
   word_id int not null,
-  line_id int not null
+  begin_index smallint not null,
+  end_index smallint not null
 );
-COPY words_lines FROM STDIN WITH CSV HEADER;
-word_id,line_id"
+COPY line_words FROM STDIN WITH CSV HEADER;
+line_id,word_id,begin_index,end_index"
 word2word_id.each do |word, word_id|
-  word2line_ids[word].each do |line_id|
-    puts "#{word_id},#{line_id}"
+  word2line_words[word].each do |line_word|
+    puts "#{line_word.line_id},#{word_id},#{line_word.begin_index},#{line_word.end_index}"
   end
 end
 puts "\\."
+
+puts "CREATE INDEX idx_line_words_word_id ON line_words(word_id);"
