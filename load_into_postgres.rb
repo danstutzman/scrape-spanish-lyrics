@@ -1,6 +1,28 @@
 # encoding: UTF-8
 require 'json'
 
+class Song
+  attr_accessor :song_id
+  attr_accessor :artist_name
+  attr_accessor :song_name
+  def initialize(song_id, artist_name, song_name)
+    @song_id     = song_id
+    @artist_name = artist_name
+    @song_name   = song_name
+  end
+end
+
+class Line
+  attr_accessor :song_id
+  attr_accessor :line_id
+  attr_accessor :text
+  def initialize(song_id, line_id, text)
+    @song_id = song_id
+    @line_id = line_id
+    @text    = text
+  end
+end
+
 class LineWord
   attr_accessor :word
   attr_accessor :line_id
@@ -9,24 +31,27 @@ class LineWord
 end
 
 lines = []
+songs = []
 word2line_words = {}
 File.open('akwid.txt') do |infile|
   infile.each_line do |json|
     object = JSON.parse(json)
     if object['type'] == 'song_text'
-      object['song_text'].each do |line|
-        line.strip!
-        if line != ''
+      song = Song.new(songs.size + 1, object['artist_name'], object['song_name'])
+      songs.push song
+      object['song_text'].each do |line_text|
+        line_text.strip!
+        if line_text != ''
+          line = Line.new(song.song_id, lines.size + 1, line_text)
           lines.push line
-          line_id = lines.size
 
           line_words = []
           current_line_word = nil
-          line.chars.each_with_index do |char, i|
+          line_text.chars.each_with_index do |char, i|
             if char.match /[a-zñáéíóúü]/i
               if current_line_word == nil
                 current_line_word = LineWord.new
-                current_line_word.line_id = line_id
+                current_line_word.line_id = line.line_id
                 current_line_word.begin_index = i
                 current_line_word.word = ''
               end
@@ -40,7 +65,7 @@ File.open('akwid.txt') do |infile|
             end
           end
           if current_line_word
-            current_line_word.end_index = line.chars.size
+            current_line_word.end_index = line_text.chars.size
             line_words.push current_line_word
             current_line_word = nil
           end
@@ -66,13 +91,14 @@ end
 puts "DROP TABLE IF EXISTS lines;
 CREATE TABLE lines (
   line_id int not null,
+  song_id int not null,
   line varchar(500) not null
 );
 COPY lines FROM STDIN WITH CSV HEADER;
-line_id,line"
+line_id,song_id,line"
 lines.each_with_index do |line, line_id0|
-  line = line.gsub('"', '""')
-  puts "#{line_id0 + 1},\"#{line}\""
+  line_text = line.text.gsub('"', '""')
+  puts "#{line_id0 + 1},#{line.song_id},\"#{line_text}\""
 end
 puts "\\."
 
@@ -107,3 +133,16 @@ end
 puts "\\."
 
 puts "CREATE INDEX idx_line_words_word_id ON line_words(word_id);"
+
+puts "DROP TABLE IF EXISTS songs;
+CREATE TABLE songs (
+  song_id int not null,
+  song_name varchar(255) not null
+);
+COPY songs FROM STDIN WITH CSV HEADER;
+song_id,song_name"
+songs.each do |song|
+  song_name = song.song_name.gsub('"', '""')
+  puts "#{song.song_id},\"#{song_name}\""
+end
+puts "\\."
