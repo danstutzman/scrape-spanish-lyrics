@@ -28,6 +28,7 @@ class LineWord
   attr_accessor :line_id
   attr_accessor :begin_index
   attr_accessor :end_index
+  attr_accessor :num_word_in_song
 end
 
 lines = []
@@ -39,6 +40,7 @@ File.open('akwid.txt') do |infile|
     if object['type'] == 'song_text'
       song = Song.new(songs.size + 1, object['artist_name'], object['song_name'])
       songs.push song
+      next_num_word_in_song = 0
       object['song_text'].each do |line_text|
         line_text.strip!
         if line_text != ''
@@ -54,6 +56,7 @@ File.open('akwid.txt') do |infile|
                 current_line_word.line_id = line.line_id
                 current_line_word.begin_index = i
                 current_line_word.word = ''
+                current_line_word.num_word_in_song = next_num_word_in_song
               end
               current_line_word.word += char
             else
@@ -61,6 +64,7 @@ File.open('akwid.txt') do |infile|
                 current_line_word.end_index = i
                 line_words.push current_line_word
                 current_line_word = nil
+                next_num_word_in_song += 1
               end
             end
           end
@@ -68,6 +72,7 @@ File.open('akwid.txt') do |infile|
             current_line_word.end_index = line_text.chars.size
             line_words.push current_line_word
             current_line_word = nil
+            next_num_word_in_song += 1
           end
 
           line_words.each do |line_word|
@@ -121,13 +126,14 @@ CREATE TABLE line_words (
   line_id int not null,
   word_id int not null,
   begin_index smallint not null,
-  end_index smallint not null
+  end_index smallint not null,
+  num_word_in_song smallint not null
 );
 COPY line_words FROM STDIN WITH CSV HEADER;
-line_id,word_id,begin_index,end_index"
+line_id,word_id,begin_index,end_index,num_word_in_song"
 word2word_id.each do |word, word_id|
   word2line_words[word].each do |line_word|
-    puts "#{line_word.line_id},#{word_id},#{line_word.begin_index},#{line_word.end_index}"
+    puts "#{line_word.line_id},#{word_id},#{line_word.begin_index},#{line_word.end_index},#{line_word.num_word_in_song}"
   end
 end
 puts "\\."
