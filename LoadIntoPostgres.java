@@ -24,6 +24,7 @@ public class LoadIntoPostgres {
 
   class Song {
     int songId;
+    int sourceNum;
     String artistName;
     String songName;
   }
@@ -47,11 +48,12 @@ public class LoadIntoPostgres {
   private Map<String, List<LineWord>> word2LineWords =
     new HashMap<String, List<LineWord>>();
 
-  private void processSongText(JSONObject object) {
+  private void processSongText(JSONObject object, int sourceNum) {
     String path = object.getString("path");
 
     Song song = new Song();
     song.songId = songs.size() + 1;
+    song.sourceNum = sourceNum;
     song.artistName = object.getString("artist_name");
     song.songName = object.getString("song_name");
     songs.add(song);
@@ -148,7 +150,7 @@ public class LoadIntoPostgres {
               !PORTUGUES_PATTERN.matcher(songName).find() &&
               !loadedSourceNums.contains(sourceNum)) {
             loadedSourceNums.add(sourceNum);
-            processSongText(object);
+            processSongText(object, sourceNum);
           }
         }
       }
@@ -164,14 +166,17 @@ public class LoadIntoPostgres {
     }
 
     System.out.println("DROP TABLE IF EXISTS songs;");
-    System.out.println("CREATE TABLE songs (song_id INT NOT NULL, song_name TEXT NOT NULL);");
+    System.out.println("CREATE TABLE songs (song_id INT NOT NULL, source_num INT NOT NULL, song_name TEXT NOT NULL);");
     System.out.println("COPY songs FROM STDIN WITH CSV HEADER;");
-    System.out.println("song_id,song_name");
+    System.out.println("song_id,source_num,song_name");
     for (Song song : songs) {
-      System.out.println("" + song.songId + ",\"" + song.songName.replaceAll("\"", "\"\"") + "\"");
+      System.out.println("" + song.songId + "," + song.sourceNum + ",\"" + song.songName.replaceAll("\"", "\"\"") + "\"");
     }
-
     System.out.println("\\.");
+    System.out.println("CREATE INDEX idx_songs_song_id ON songs(song_id);");
+    System.out.println("CREATE INDEX idx_songs_source_num ON songs(source_num);");
+    System.out.println("CREATE INDEX idx_songs_song_name ON songs(song_name);");
+
     System.out.println("DROP TABLE IF EXISTS lines;");
     System.out.println("CREATE TABLE lines (line_id INT NOT NULL, song_id INT NOT NULL, line TEXT NOT NULL);");
     System.out.println("COPY lines FROM STDIN WITH CSV HEADER;");
