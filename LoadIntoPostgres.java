@@ -170,11 +170,11 @@ public class LoadIntoPostgres {
     }
 
     System.out.println("DROP TABLE IF EXISTS songs;");
-    System.out.println("CREATE TABLE songs (song_id INT NOT NULL, source_num INT NOT NULL, song_name TEXT NOT NULL);");
+    System.out.println("CREATE TABLE songs (song_id INT NOT NULL, source_num INT NOT NULL, artist_name TEXT NOT NULL, song_name TEXT NOT NULL);");
     System.out.println("COPY songs FROM STDIN WITH CSV HEADER;");
     System.out.println("song_id,source_num,song_name");
     for (Song song : songs) {
-      System.out.println("" + song.songId + "," + song.sourceNum + ",\"" + song.songName.replaceAll("\"", "\"\"") + "\"");
+      System.out.println("" + song.songId + "," + song.sourceNum + ",\"" + song.artistName.replaceAll("\"", "\"\"") + "\",\"" + song.songName.replaceAll("\"", "\"\"") + "\"");
     }
     System.out.println("\\.");
     System.out.println("CREATE INDEX idx_songs_song_id ON songs(song_id);");
