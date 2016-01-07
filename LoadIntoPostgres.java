@@ -1,6 +1,8 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -11,6 +13,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class LoadIntoPostgres {
+  private static Pattern ESPANOL_PATTERN =
+    Pattern.compile("es?p?a[nñ]ol", Pattern.CASE_INSENSITIVE);
+
+  private static Pattern PORTUGUES_PATTERN =
+    Pattern.compile("portugues", Pattern.CASE_INSENSITIVE);
+
+  private static Pattern MUSICA_PATH_PATTERN =
+    Pattern.compile("letras.asp\\?letra=([0-9]+)");
+
   class Song {
     int songId;
     String artistName;
@@ -124,9 +135,21 @@ public class LoadIntoPostgres {
       Set<Integer> loadedSourceNums = new HashSet<Integer>();
       while ((line = reader.readLine()) != null) {
         JSONObject object = new JSONObject(line);
-        if (object.getString("type").equals("song_text") &&
-            !object.getString("song_name").equals("")) {
-          processSongText(object);
+        if (object.getString("type").equals("song_text")) {
+          String path = object.getString("path");
+          Matcher matcher = MUSICA_PATH_PATTERN.matcher(path);
+          if (!matcher.matches()) {
+            throw new RuntimeException("Couldn't parse path '" + path + "'");
+          }
+          int sourceNum = Integer.parseInt(matcher.group(1));
+          String songName = object.getString("song_name");
+          if (!songName.equals("") &&
+              !ESPANOL_PATTERN.matcher(songName).find() &&
+              !PORTUGUES_PATTERN.matcher(songName).find() &&
+              !loadedSourceNums.contains(sourceNum)) {
+            loadedSourceNums.add(sourceNum);
+            processSongText(object);
+          }
         }
       }
     } catch (java.io.IOException e) {
