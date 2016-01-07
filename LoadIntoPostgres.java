@@ -19,6 +19,9 @@ public class LoadIntoPostgres {
   private static Pattern PORTUGUES_PATTERN =
     Pattern.compile("portugues", Pattern.CASE_INSENSITIVE);
 
+  private static Pattern INGLES_PATTERN =
+    Pattern.compile("ingl[ée]s", Pattern.CASE_INSENSITIVE);
+
   private static Pattern MUSICA_PATH_PATTERN =
     Pattern.compile("letras.asp\\?letra=([0-9]+)");
 
@@ -148,6 +151,7 @@ public class LoadIntoPostgres {
           if (!songName.equals("") &&
               !ESPANOL_PATTERN.matcher(songName).find() &&
               !PORTUGUES_PATTERN.matcher(songName).find() &&
+              !INGLES_PATTERN.matcher(songName).find() &&
               !loadedSourceNums.contains(sourceNum)) {
             loadedSourceNums.add(sourceNum);
             processSongText(object, sourceNum);
