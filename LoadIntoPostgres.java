@@ -138,6 +138,32 @@ public class LoadIntoPostgres {
     }
     File jsonFile = new File(argv[0]);
 
+    System.err.println("Reading words.en.txt...");
+    Set<String> enWords = new HashSet<String>();
+    try {
+      BufferedReader reader = new BufferedReader(new FileReader("words.en.txt"));
+      String line;
+      while ((line = reader.readLine()) != null) {
+        enWords.add(line.trim().toLowerCase());
+      }
+    } catch (java.io.IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    System.err.println("Reading words.es.txt...");
+    Set<String> esWords = new HashSet<String>();
+    try {
+      BufferedReader reader = new BufferedReader(new FileReader("words.es.txt"));
+      String line;
+      while ((line = reader.readLine()) != null) {
+        for (String word : line.trim().toLowerCase().split(" ")) {
+          esWords.add(word);
+        }
+      }
+    } catch (java.io.IOException e) {
+      throw new RuntimeException(e);
+    }
+
     try {
       BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
       String line;
@@ -158,7 +184,26 @@ public class LoadIntoPostgres {
               !INGLES_PATTERN.matcher(songName).find() &&
               !loadedSourceNums.contains(sourceNum)) {
             loadedSourceNums.add(sourceNum);
-            processSongText(object, sourceNum);
+
+            JSONArray songTextLines = object.getJSONArray("song_text");
+            int numEnWords = 0;
+            int numEsWords = 0;
+            int numAllWords = 0;
+            for (int l = 0; l < songTextLines.length(); l++) {
+              String lineText = songTextLines.getString(l).trim();
+              for (String word : lineText.split("[^a-zñáéíóúü]+")) {
+                if (enWords.contains(word)) {
+                  numEnWords += 1;
+                }
+                if (esWords.contains(word)) {
+                  numEsWords += 1;
+                }
+                numAllWords += 1;
+              }
+            }
+            if (numEsWords >= numEnWords && numEsWords > numAllWords / 2) {
+              processSongText(object, sourceNum);
+            }
           }
         }
       }
