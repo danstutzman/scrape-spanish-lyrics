@@ -17,7 +17,7 @@ public class LoadIntoPostgres {
     Pattern.compile("es?p?a[nñ]ol", Pattern.CASE_INSENSITIVE);
 
   private static Pattern PORTUGUES_PATTERN =
-    Pattern.compile("portugues", Pattern.CASE_INSENSITIVE);
+    Pattern.compile("portugu[ée]s", Pattern.CASE_INSENSITIVE);
 
   private static Pattern INGLES_PATTERN =
     Pattern.compile("ingl[ée]s", Pattern.CASE_INSENSITIVE);
