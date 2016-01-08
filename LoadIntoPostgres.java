@@ -35,6 +35,7 @@ public class LoadIntoPostgres {
   class Line {
     int songId;
     int lineId;
+    int numLineInSong;
     String text;
   }
 
@@ -48,6 +49,7 @@ public class LoadIntoPostgres {
 
   private List<Line> lines = new ArrayList<Line>();
   private List<Song> songs = new ArrayList<Song>();
+  private Map<Integer, Integer> songIdToSourceNum = new HashMap<Integer, Integer>();
   private Map<String, List<LineWord>> word2LineWords =
     new HashMap<String, List<LineWord>>();
 
@@ -60,15 +62,17 @@ public class LoadIntoPostgres {
     song.artistName = object.getString("artist_name");
     song.songName = object.getString("song_name");
     songs.add(song);
+    songIdToSourceNum.put(song.songId, song.sourceNum);
 
     int nextNumWordInSong = 0;
     JSONArray songTextLines = object.getJSONArray("song_text");
     for (int l = 0; l < songTextLines.length(); l++) {
       String lineText = songTextLines.getString(l).trim();
-      if (!lineText.equals("")) {
+      if (true) { //!lineText.equals("")) { // comment to avoid messing up line nums
         Line line = new Line();
         line.songId = song.songId;
         line.lineId = lines.size() + 1;
+        line.numLineInSong = l;
         line.text = lineText;
         lines.add(line);
 
@@ -182,16 +186,16 @@ public class LoadIntoPostgres {
     System.out.println("CREATE INDEX idx_songs_song_name ON songs(song_name);");
 
     System.out.println("DROP TABLE IF EXISTS lines;");
-    System.out.println("CREATE TABLE lines (line_id INT NOT NULL, song_id INT NOT NULL, line TEXT NOT NULL);");
+    System.out.println("CREATE TABLE lines (line_id INT NOT NULL, song_id INT NOT NULL, song_source_num INT NOT NULL, num_line_in_song INT NOT NULL, line TEXT NOT NULL);");
     System.out.println("COPY lines FROM STDIN WITH CSV HEADER;");
-    System.out.println("line_id,song_id,line");
+    System.out.println("line_id,song_id,song_source_num,num_line_in_song,line");
     for (Line line : lines) {
-      System.out.println("" + line.lineId + "," + line.songId + ",\"" + line.text.replaceAll("\"", "\"\"") + "\"");
+      System.out.println("" + line.lineId + "," + line.songId + "," + songIdToSourceNum.get(line.songId) + "," + line.numLineInSong + ",\"" + line.text.replaceAll("\"", "\"\"") + "\"");
     }
     System.out.println("\\.");
     System.out.println("create index idx_lines_line_id on lines(line_id);");
     System.out.println("create index idx_lines_song_id on lines(song_id);");
-    System.out.println("alter table lines add column audio_excerpt_filename text;");
+    System.out.println("create index idx_lines_song_source_num_num_line_in_song on lines(song_source_num, num_line_in_song);");
 
     System.out.println("DROP TABLE IF EXISTS words;");
     System.out.println("CREATE TABLE words (word_id INT NOT NULL, word TEXT NOT NULL);");
