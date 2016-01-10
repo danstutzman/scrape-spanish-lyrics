@@ -48,7 +48,7 @@ public class LoadIntoPostgres {
     Integer endCharHighlight;
     int endCharPunctuation;
     int numWordInSong;
-    String word;
+    String wordLowercase;
     String partOfSpeech;
     String lemma;
   }
@@ -181,7 +181,7 @@ public class LoadIntoPostgres {
         }
 
         for (LineWord lineWord : thisLinesLineWords) {
-          lineWord.word = lineTextLowercase.substring(
+          lineWord.wordLowercase = lineTextLowercase.substring(
             lineWord.beginCharHighlight, lineWord.endCharHighlight);
         }
 
@@ -202,83 +202,90 @@ public class LoadIntoPostgres {
         }
         lemmaLine = lemmaLines.get(lastLemmaLineNum);
       }
-      if (!lineWord.word.equalsIgnoreCase(lemmaLine[0])) {
-        if (equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "lo") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "la") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "le") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "las") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "los") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "les") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "me") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "te") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "se") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "nos") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "os") ||
+      String lemmaWord = lemmaLine[0].toLowerCase();
+      if (!lineWord.wordLowercase.equals(lemmaWord)) {
+        if (equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "lo") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "la") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "le") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "las") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "los") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "les") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "me") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "te") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "se") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "nos") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "os") ||
             false) {
           // ignore cases like perderla being split into perder and la
           lastLemmaLineNum += 1;
-        } else if (equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melo") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "mela") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melos") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melas") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telo") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "tela") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telos") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telas") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selo") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "sela") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selos") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selas") ||
-            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "seme") ||
+        } else if (equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "melo") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "mela") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "melos") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "melas") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "telo") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "tela") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "telos") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "telas") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selo") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "sela") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selos") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selas") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "seme") ||
             false) {
           lastLemmaLineNum += 2;
-        } else if (lineWord.word.toLowerCase().endsWith("aos") &&
-            lemmaLine[0].toLowerCase().endsWith("ad")) {
+        } else if (lineWord.wordLowercase.endsWith("aos") &&
+            lemmaWord.endsWith("ad")) {
           // jorobaos -> jorobad os?
           lastLemmaLineNum += 1;
-        } else if (lemmaLine[0].equalsIgnoreCase(lineWord.word + "_de")) {
+        } else if (lemmaWord.equals(lineWord.wordLowercase + "_de")) {
           // dentro de -> dentro_de
           lastLemmaLineNum -= 1;
-        } else if (lemmaLine[0].toLowerCase().endsWith("_donde")) {
+        } else if (lemmaWord.endsWith("_donde")) {
           lastLemmaLineNum -= 1;
-        } else if (lineWord.word.equalsIgnoreCase("del") &&
-            lemmaLine[0].toLowerCase().endsWith("de")) {
+        } else if (lineWord.wordLowercase.equals("del") &&
+            lemmaWord.endsWith("de")) {
           // del -> de el
           lastLemmaLineNum += 1;
-        } else if (lineWord.word.equalsIgnoreCase("al") &&
-            lemmaLine[0].toLowerCase().endsWith("a")) {
+        } else if (lineWord.wordLowercase.equals("al") &&
+            lemmaWord.endsWith("a")) {
           // al -> a el
           lastLemmaLineNum += 1;
-        } else if (lineWord.word.toLowerCase().endsWith("onos")) {
+        } else if (lineWord.wordLowercase.endsWith("onos")) {
           // vamonos -> vamos nos
           lastLemmaLineNum += 1;
-        } else if (lemmaLine[0].contains("ò") ||
-                   lemmaLine[0].contains("à") ||
-                   lemmaLine[0].contains("û") ||
-                   lemmaLine[0].contains("ä") ||
-                   lemmaLine[0].contains("è") ||
-                   lemmaLine[0].contains("º")) {
+        } else if (lemmaWord.contains("ò") ||
+                   lemmaWord.contains("à") ||
+                   lemmaWord.contains("û") ||
+                   lemmaWord.contains("ä") ||
+                   lemmaWord.contains("è") ||
+                   lemmaWord.contains("º")) {
           // backwards accent mark or other unconvertible
           lastLemmaLineNum -= 1;
-        } else if (lemmaLine[0].equalsIgnoreCase(lineWord.word + ".")) {
+        } else if (lemmaWord.equals(lineWord.wordLowercase + ".")) {
           // interpreting mar. (at end of sentence) as abbreviation for marzo
         } else {
-          throw new RuntimeException("Expected '" + lineWord.word + "' but found '" + lemmaLine[0] + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
+          throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
         }
       }
       lineWord.partOfSpeech = lemmaLine[2];
       lineWord.lemma = lemmaLine[1];
 
-      if (!word2LineWords.containsKey(lineWord.word)) {
-        word2LineWords.put(lineWord.word, new ArrayList<LineWord>());
+      if (!word2LineWords.containsKey(lineWord.wordLowercase)) {
+        word2LineWords.put(lineWord.wordLowercase, new ArrayList<LineWord>());
       }
-      word2LineWords.get(lineWord.word).add(lineWord);
+      word2LineWords.get(lineWord.wordLowercase).add(lineWord);
     }
   }
 
-  private static boolean equalsIgnoreCaseAndAccent(String s1, String s2) {
-    s1 = s1.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
-    s2 = s2.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+  private static boolean equalsIgnoreAccent(String s1, String s2) {
+    if (!s1.equals(s1.toLowerCase())) {
+      throw new RuntimeException("Non-lowercase input: " + s1);
+    }
+    if (!s2.equals(s2.toLowerCase())) {
+      throw new RuntimeException("Non-lowercase input: " + s2);
+    }
+    s1 = s1.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+    s2 = s2.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
     return s1.equals(s2);
   }
 
