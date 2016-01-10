@@ -424,9 +424,9 @@ new File(lemmaDir, "" + sourceNum + ".out").length() > 0) {
     System.out.println("CREATE INDEX idx_words_word_word ON words(word);");
 
     System.out.println("DROP TABLE IF EXISTS line_words;");
-    System.out.println("CREATE TABLE line_words (line_id INT NOT NULL, song_id INT NOT NULL, word_id INT NOT NULL, begin_char_punctuation SMALLINT NOT NULL, begin_char_highlight SMALLINT NOT NULL, end_char_highlight SMALLINT NOT NULL, end_char_punctuation SMALLINT NOT NULL, num_word_in_song SMALLINT NOT NULL, part_of_speech TEXT NOT NULL, lemma TEXT NOT NULL);");
+    System.out.println("CREATE TABLE line_words (line_id INT NOT NULL, song_id INT NOT NULL, word_id INT NOT NULL, begin_char_punctuation SMALLINT NOT NULL, begin_char_highlight SMALLINT NOT NULL, end_char_highlight SMALLINT NOT NULL, end_char_punctuation SMALLINT NOT NULL, word_lowercase TEXT NOT NULL, num_word_in_song SMALLINT NOT NULL, part_of_speech TEXT NOT NULL, lemma TEXT NOT NULL);");
     System.out.println("COPY line_words FROM STDIN WITH CSV HEADER;");
-    System.out.println("line_id,song_id,word_id,begin_char_punctuation,begin_char_highlight,end_char_highlight,end_char_punctuation,num_word_in_song,part_of_speech,lemma");
+    System.out.println("line_id,song_id,word_id,begin_char_punctuation,begin_char_highlight,end_char_highlight,end_char_punctuation,word_lowercase,num_word_in_song,part_of_speech,lemma");
 
     for (String word : word2WordId.keySet()) {
       Integer wordId = word2WordId.get(word);
@@ -439,6 +439,7 @@ new File(lemmaDir, "" + sourceNum + ".out").length() > 0) {
           lineWord.beginCharHighlight + "," +
           lineWord.endCharHighlight + "," +
           lineWord.endCharPunctuation + "," +
+          "\"" + lineWord.wordLowercase + "\"," +
           lineWord.numWordInSong + "," +
           lineWord.partOfSpeech + "," +
           "\"" + lineWord.lemma + "\"");
