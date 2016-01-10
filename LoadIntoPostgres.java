@@ -3,6 +3,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -42,9 +43,14 @@ public class LoadIntoPostgres {
   class LineWord {
     int songId;
     int lineId;
-    int beginIndex;
-    int endIndex;
+    int beginCharPunctuation;
+    Integer beginCharHighlight;
+    Integer endCharHighlight;
+    int endCharPunctuation;
     int numWordInSong;
+    String word;
+    String partOfSpeech;
+    String lemma;
   }
 
   private List<Line> lines = new ArrayList<Line>();
@@ -53,9 +59,7 @@ public class LoadIntoPostgres {
   private Map<String, List<LineWord>> word2LineWords =
     new HashMap<String, List<LineWord>>();
 
-  private void processSongText(JSONObject object, int sourceNum) {
-    String path = object.getString("path");
-
+  private void processSongText(JSONObject object, int sourceNum, File lemmaDir) {
     Song song = new Song();
     song.songId = songs.size() + 1;
     song.sourceNum = sourceNum;
@@ -64,6 +68,30 @@ public class LoadIntoPostgres {
     songs.add(song);
     songIdToSourceNum.put(song.songId, song.sourceNum);
 
+    List<String[]> lemmaLines = new ArrayList<String[]>();
+    File lemmaFile;
+    try {
+      lemmaFile = new File(lemmaDir, "" + sourceNum + ".out");
+      if (!lemmaFile.exists()) {
+        throw new RuntimeException("Can't find " + lemmaFile.getAbsolutePath());
+      }
+
+      BufferedReader lemmaReader = new BufferedReader(new FileReader(
+        new File(lemmaDir, "" + sourceNum + ".out")));
+      String lemmaLine;
+      while ((lemmaLine = lemmaReader.readLine()) != null) {
+        String[] values = lemmaLine.split(" ");
+        for (String wordBetweenPunctuation : values[0].replace("_%", "").split("(_|\\.|-|'|,|:)")) {
+          String[] valuesClone = Arrays.copyOf(values, values.length);
+          valuesClone[0] = wordBetweenPunctuation;
+          lemmaLines.add(valuesClone);
+        }
+      }
+    } catch (java.io.IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    List<LineWord> lineWords = new ArrayList<LineWord>();
     int nextNumWordInSong = 0;
     JSONArray songTextLines = object.getJSONArray("song_text");
     for (int l = 0; l < songTextLines.length(); l++) {
@@ -78,53 +106,180 @@ public class LoadIntoPostgres {
 
         String lineTextLowercase = lineText.toLowerCase();
         LineWord currentLineWord = null;
-        List<LineWord> lineWords = new ArrayList<LineWord>();
-
+        List<LineWord> thisLinesLineWords = new ArrayList<LineWord>();
         for (int i = 0; i < lineTextLowercase.length(); i++) {
           char c = lineTextLowercase.charAt(i);
           if ((c >= 'a' && c <= 'z') ||
               c == 'ñ' || c == 'á' || c == 'é' || c == 'í' || c == 'ó'
-              || c == 'ú' || c == 'ü') {
+              || c == 'ú' || c == 'ü' || (c >= '0' && c <= '9')) {
             if (currentLineWord == null) {
               currentLineWord = new LineWord();
               currentLineWord.songId = song.songId;
               currentLineWord.lineId = line.lineId;
-              currentLineWord.beginIndex = i;
+              currentLineWord.beginCharPunctuation = i;
+              currentLineWord.beginCharHighlight = i;
               currentLineWord.numWordInSong = nextNumWordInSong;
+            } else {
+              if (currentLineWord.beginCharHighlight == null) {
+                // if we started the word punctuation but not the a-z yet
+                currentLineWord.beginCharHighlight = i;
+              } else if (currentLineWord.endCharHighlight != null) {
+                // if there's end punctuation already in this word
+                currentLineWord.endCharPunctuation = i;
+                thisLinesLineWords.add(currentLineWord);
+                currentLineWord = null;
+                nextNumWordInSong += 1;
+
+                currentLineWord = new LineWord();
+                currentLineWord.songId = song.songId;
+                currentLineWord.lineId = line.lineId;
+                currentLineWord.beginCharPunctuation = i;
+                currentLineWord.beginCharHighlight = i;
+                currentLineWord.numWordInSong = nextNumWordInSong;
+              }
             }
-          } else {
+          } else if (c == ' ') {
             if (currentLineWord != null) {
-              currentLineWord.endIndex = i;
-              lineWords.add(currentLineWord);
-              currentLineWord = null;
-              nextNumWordInSong += 1;
+              if (currentLineWord.beginCharHighlight != null) {
+                // end the word
+                if (currentLineWord.endCharHighlight == null) {
+                  currentLineWord.endCharHighlight = i;
+                }
+                currentLineWord.endCharPunctuation = i;
+                thisLinesLineWords.add(currentLineWord);
+                currentLineWord = null;
+                nextNumWordInSong += 1;
+              } else {
+                // word didn't contain non-punctuation; throw it out
+                currentLineWord = null;
+              }
+            }
+          } else { // some kind of punctuation
+            if (currentLineWord == null) {
+              currentLineWord = new LineWord();
+              currentLineWord.songId = song.songId;
+              currentLineWord.lineId = line.lineId;
+              currentLineWord.beginCharPunctuation = i;
+              currentLineWord.numWordInSong = nextNumWordInSong;
+            } else {
+              // end the highlight but not the word
+              if (currentLineWord.beginCharHighlight != null &&
+                  currentLineWord.endCharHighlight == null) {
+                currentLineWord.endCharHighlight = i;
+              }
             }
           }
         }
-        if (currentLineWord != null) {
-          currentLineWord.endIndex = lineTextLowercase.length();
-          lineWords.add(currentLineWord);
+        if (currentLineWord != null && currentLineWord.beginCharHighlight != null) {
+          if (currentLineWord.endCharHighlight == null) {
+            currentLineWord.endCharHighlight = lineTextLowercase.length();
+          }
+          currentLineWord.endCharPunctuation = lineTextLowercase.length();
+          thisLinesLineWords.add(currentLineWord);
           currentLineWord = null;
           nextNumWordInSong += 1;
         }
 
-          if (lineText.startsWith("Eso no es para que tú te preocupes")) {
-            for (LineWord lineWord : lineWords) {
-//              System.out.println("" + lineWord.beginIndex + "," + lineWord.endIndex);
-            }
-          }
+        for (LineWord lineWord : thisLinesLineWords) {
+          lineWord.word = lineTextLowercase.substring(
+            lineWord.beginCharHighlight, lineWord.endCharHighlight);
+        }
 
+        lineWords.addAll(thisLinesLineWords);
+      } // end if true
+    } // next line
 
-        for (LineWord lineWord : lineWords) {
-          String word = 
-            lineTextLowercase.substring(lineWord.beginIndex, lineWord.endIndex);
-          if (!word2LineWords.containsKey(word)) {
-            word2LineWords.put(word, new ArrayList<LineWord>());
-          }
-          word2LineWords.get(word).add(lineWord);
+    int lastLemmaLineNum = -1;
+    for (LineWord lineWord : lineWords) {
+
+      lastLemmaLineNum += 1;
+      String[] lemmaLine = lemmaLines.get(lastLemmaLineNum);
+      // Parts of speech starting with F are punctuation-only
+      while (lemmaLine[0].equals("") || lemmaLine[2].startsWith("F")) {
+        lastLemmaLineNum += 1;
+        if (lemmaLines.size() <= lastLemmaLineNum) {
+          throw new RuntimeException("Ran out of " + lemmaFile.getAbsolutePath());
+        }
+        lemmaLine = lemmaLines.get(lastLemmaLineNum);
+      }
+      if (!lineWord.word.equalsIgnoreCase(lemmaLine[0])) {
+        if (equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "lo") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "la") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "le") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "las") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "los") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "les") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "me") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "te") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "se") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "nos") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "os") ||
+            false) {
+          // ignore cases like perderla being split into perder and la
+          lastLemmaLineNum += 1;
+        } else if (equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melo") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "mela") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melos") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "melas") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telo") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "tela") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telos") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "telas") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selo") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "sela") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selos") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "selas") ||
+            equalsIgnoreCaseAndAccent(lineWord.word, lemmaLine[0] + "seme") ||
+            false) {
+          lastLemmaLineNum += 2;
+        } else if (lineWord.word.toLowerCase().endsWith("aos") &&
+            lemmaLine[0].toLowerCase().endsWith("ad")) {
+          // jorobaos -> jorobad os?
+          lastLemmaLineNum += 1;
+        } else if (lemmaLine[0].equalsIgnoreCase(lineWord.word + "_de")) {
+          // dentro de -> dentro_de
+          lastLemmaLineNum -= 1;
+        } else if (lemmaLine[0].toLowerCase().endsWith("_donde")) {
+          lastLemmaLineNum -= 1;
+        } else if (lineWord.word.equalsIgnoreCase("del") &&
+            lemmaLine[0].toLowerCase().endsWith("de")) {
+          // del -> de el
+          lastLemmaLineNum += 1;
+        } else if (lineWord.word.equalsIgnoreCase("al") &&
+            lemmaLine[0].toLowerCase().endsWith("a")) {
+          // al -> a el
+          lastLemmaLineNum += 1;
+        } else if (lineWord.word.toLowerCase().endsWith("onos")) {
+          // vamonos -> vamos nos
+          lastLemmaLineNum += 1;
+        } else if (lemmaLine[0].contains("ò") ||
+                   lemmaLine[0].contains("à") ||
+                   lemmaLine[0].contains("û") ||
+                   lemmaLine[0].contains("ä") ||
+                   lemmaLine[0].contains("è") ||
+                   lemmaLine[0].contains("º")) {
+          // backwards accent mark or other unconvertible
+          lastLemmaLineNum -= 1;
+        } else if (lemmaLine[0].equalsIgnoreCase(lineWord.word + ".")) {
+          // interpreting mar. (at end of sentence) as abbreviation for marzo
+        } else {
+          throw new RuntimeException("Expected '" + lineWord.word + "' but found '" + lemmaLine[0] + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
         }
       }
+      lineWord.partOfSpeech = lemmaLine[2];
+      lineWord.lemma = lemmaLine[1];
+
+      if (!word2LineWords.containsKey(lineWord.word)) {
+        word2LineWords.put(lineWord.word, new ArrayList<LineWord>());
+      }
+      word2LineWords.get(lineWord.word).add(lineWord);
     }
+  }
+
+  private static boolean equalsIgnoreCaseAndAccent(String s1, String s2) {
+    s1 = s1.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+    s2 = s2.toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+    return s1.equals(s2);
   }
 
   public static void main(String[] argv) {
@@ -137,6 +292,12 @@ public class LoadIntoPostgres {
       System.exit(1);
     }
     File jsonFile = new File(argv[0]);
+
+    if (argv.length < 2) {
+      System.err.println("Second argument: directory with FreeLing lemma output");
+      System.exit(1);
+    }
+    File lemmaDir = new File(argv[1]);
 
     System.err.println("Reading words.en.txt...");
     Set<String> enWords = new HashSet<String>();
@@ -182,7 +343,9 @@ public class LoadIntoPostgres {
               !ESPANOL_PATTERN.matcher(songName).find() &&
               !PORTUGUES_PATTERN.matcher(songName).find() &&
               !INGLES_PATTERN.matcher(songName).find() &&
-              !loadedSourceNums.contains(sourceNum)) {
+              !loadedSourceNums.contains(sourceNum) &&
+new File(lemmaDir, "" + sourceNum + ".out").exists() &&
+new File(lemmaDir, "" + sourceNum + ".out").length() > 0) {
             loadedSourceNums.add(sourceNum);
 
             JSONArray songTextLines = object.getJSONArray("song_text");
@@ -202,7 +365,7 @@ public class LoadIntoPostgres {
               }
             }
             if (numEsWords >= numEnWords && numEsWords > numAllWords / 2) {
-              processSongText(object, sourceNum);
+              processSongText(object, sourceNum, lemmaDir);
             }
           }
         }
@@ -254,19 +417,28 @@ public class LoadIntoPostgres {
     System.out.println("CREATE INDEX idx_words_word_word ON words(word);");
 
     System.out.println("DROP TABLE IF EXISTS line_words;");
-    System.out.println("CREATE TABLE line_words (line_id INT NOT NULL, song_id INT NOT NULL, word_id INT NOT NULL, begin_index SMALLINT NOT NULL, end_index SMALLINT NOT NULL, num_word_in_song SMALLINT NOT NULL);");
+    System.out.println("CREATE TABLE line_words (line_id INT NOT NULL, song_id INT NOT NULL, word_id INT NOT NULL, begin_char_punctuation SMALLINT NOT NULL, begin_char_highlight SMALLINT NOT NULL, end_char_highlight SMALLINT NOT NULL, end_char_punctuation SMALLINT NOT NULL, num_word_in_song SMALLINT NOT NULL, part_of_speech TEXT NOT NULL, lemma TEXT NOT NULL);");
     System.out.println("COPY line_words FROM STDIN WITH CSV HEADER;");
-    System.out.println("line_id,song_id,word_id,begin_index,end_index,num_word_in_song");
+    System.out.println("line_id,song_id,word_id,begin_char_punctuation,begin_char_highlight,end_char_highlight,end_char_punctuation,num_word_in_song,part_of_speech,lemma");
 
     for (String word : word2WordId.keySet()) {
       Integer wordId = word2WordId.get(word);
       for (LineWord lineWord : word2LineWords.get(word)) {
-        System.out.println("" + lineWord.lineId + "," + lineWord.songId + "," +
-          wordId + "," + lineWord.beginIndex + "," + lineWord.endIndex +
-          "," + lineWord.numWordInSong);
+        System.out.println("" +
+          lineWord.lineId + "," +
+          lineWord.songId + "," +
+          wordId + "," +
+          lineWord.beginCharPunctuation + "," +
+          lineWord.beginCharHighlight + "," +
+          lineWord.endCharHighlight + "," +
+          lineWord.endCharPunctuation + "," +
+          lineWord.numWordInSong + "," +
+          lineWord.partOfSpeech + "," +
+          "\"" + lineWord.lemma + "\"");
       }
     }
     System.out.println("\\.");
+    System.out.println("CREATE INDEX idx_line_words_line_id ON line_words(line_id);");
     System.out.println("CREATE INDEX idx_line_words_word_id ON line_words(word_id);");
     System.out.println("CREATE INDEX idx_line_words_song_id_num_word_in_song ON line_words(song_id, num_word_in_song);");
   }
