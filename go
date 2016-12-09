@@ -1,10 +1,9 @@
 #!/bin/bash -ex
 if [ "$1" == "" ]; then
-  echo 2>&1 "Specify .txt file to load as first argument"
+  echo 2>&1 "Specify .txt files to load as first argument"
   exit 1
 fi
 PSQL=/Applications/Postgres.app/Contents/MacOS/bin/psql
-mkdir -p lemmatized
 
 echo "Starting lemmatizer server..."
 FREELINGSHARE=/usr/local/share/freeling \
@@ -13,7 +12,6 @@ FREELINGSHARE=/usr/local/share/freeling \
 LEMMATIZER_PID="$!"
 sleep 6
 
-javac LoadIntoPostgres.java && \
-  java LoadIntoPostgres $1 lemmatized ~/dev/lemmatize-spanish | $PSQL -U postgres
+javac LoadIntoPostgres.java && java LoadIntoPostgres ~/dev/lemmatize-spanish/myfreeling/src/main/analyzer_client $@ | $PSQL -U postgres
 
 kill $LEMMATIZER_PID

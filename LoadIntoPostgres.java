@@ -331,23 +331,21 @@ public class LoadIntoPostgres {
   }
 
   private void instanceMain(String[] argv) {
-    if (argv.length < 1) {
-      System.err.println("First argument: location of .json file");
-      System.exit(1);
-    }
-    File jsonFile = new File(argv[0]);
-
     if (argv.length < 2) {
-      System.err.println("Second argument: directory with FreeLing lemma output");
+      System.err.println("First arg: path to analyzerClient");
+      System.err.println("Second arg: line number of .txt file to start at");
+      System.err.println("3rd or more args: .txt files containing JSON to load");
       System.exit(1);
     }
-    File lemmaDir = new File(argv[1]);
+    File analyzerClientFile = new File(argv[0]);
+    int startingLineNum = Integer.parseInt(argv[1]);
+    List<File> jsonFiles = new ArrayList<File>();
+    for (int i = 2; i < argv.length; i++) {
+      jsonFiles.add(new File(argv[i]));
+    }
 
-    if (argv.length < 3) {
-      System.err.println("Third argument: directory with myfreeling dir");
-      System.exit(1);
-    }
-    File myfreelingParentDir = new File(argv[2]);
+    File lemmaDir = new File("lemmatized");
+    lemmaDir.mkdir(); // ignore success
 
     System.err.println("Reading words.en.txt...");
     Set<String> enWords = new HashSet<String>();
@@ -375,103 +373,146 @@ public class LoadIntoPostgres {
       throw new RuntimeException(e);
     }
 
-    try {
-      BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
-      String line;
-      Set<Integer> loadedSourceNums = new HashSet<Integer>();
-      while ((line = reader.readLine()) != null) {
-        JSONObject object = new JSONObject(line);
-        if (object.getString("type").equals("song_text")) {
-          String path = object.getString("path");
-          Matcher matcher = MUSICA_PATH_PATTERN.matcher(path);
-          if (!matcher.matches()) {
-            throw new RuntimeException("Couldn't parse path '" + path + "'");
-          }
-          int sourceNum = Integer.parseInt(matcher.group(1));
-          String songName = object.getString("song_name");
-          if (songName.equals("")) {
-            System.err.println("Skipping " + sourceNum + " because blank");
-          } else if (ESPANOL_PATTERN.matcher(songName).find() ||
-              PORTUGUES_PATTERN.matcher(songName).find() ||
-              INGLES_PATTERN.matcher(songName).find()) {
-            System.err.println("Skipping " + songName + " because name");
-          } else if (loadedSourceNums.contains(sourceNum)) {
-            System.err.println("Skipping " + sourceNum + " because already loaded");
-          } else {
-            loadedSourceNums.add(sourceNum);
-
-            JSONArray songTextLines = object.getJSONArray("song_text");
-            int numEnWords = 0;
-            int numEsWords = 0;
-            int numAllWords = 0;
-            for (int l = 0; l < songTextLines.length(); l++) {
-              String lineText = songTextLines.getString(l).trim();
-              for (String word : lineText.split("[^a-zñáéíóúü]+")) {
-                if (enWords.contains(word)) {
-                  numEnWords += 1;
-                }
-                if (esWords.contains(word)) {
-                  numEsWords += 1;
-                }
-                numAllWords += 1;
-              }
-            }
-            if (numEsWords >= numEnWords && numEsWords > numAllWords / 2) {
-              // Generate lemmas if not done yet
-              File lemmaFile = new File(lemmaDir, "" + sourceNum + ".out");
-              if (!lemmaFile.exists() || lemmaFile.length() == 0) {
-                String[] lemmatizerClientCommand = {
-                  myfreelingParentDir.getAbsolutePath() +
-                    "/myfreeling/src/main/analyzer_client", "3001" };
-                Process clientChild =
-                  Runtime.getRuntime().exec(lemmatizerClientCommand);
-
-                BufferedWriter clientWriter = new BufferedWriter(
-                  new OutputStreamWriter(clientChild.getOutputStream()));
-                for (int l = 0; l < songTextLines.length(); l++) {
-                  String lineText = songTextLines.getString(l).trim();
-                  clientWriter.write(lineText);
-                  clientWriter.write("\n");
-                }
-                clientWriter.close();
-
-                try { clientChild.waitFor(); } catch (InterruptedException e) {}
-
-                BufferedReader clientErrorReader = new BufferedReader(
-                  new InputStreamReader(clientChild.getErrorStream()));
-                if (clientErrorReader.ready()) {
-                  String clientErrorLine = clientErrorReader.readLine();
-                  System.err.println("Client error: " + clientErrorLine);
-                  while (clientErrorLine != null) {
-                    System.err.println("Client error: " + clientErrorLine);
-                    clientErrorLine = clientErrorReader.readLine();
-                  }
-                }
-
-                BufferedReader clientReader = new BufferedReader(
-                  new InputStreamReader(clientChild.getInputStream()));
-                BufferedWriter lemmaFileWriter = new BufferedWriter(
-                  new OutputStreamWriter(new FileOutputStream(lemmaFile)));
-                String line3 = clientReader.readLine();
-                while (line3 != null) {
-                  lemmaFileWriter.write(line3);
-                  lemmaFileWriter.write("\n");
-                  line3 = clientReader.readLine();
-                }
-
-                lemmaFileWriter.close();
-                System.err.println("Wrote lemmas to " + lemmaFile);
-              }
-
-              processSongText(object, sourceNum, lemmaDir);
-            }
-          }
+    for (File jsonFile : jsonFiles) {
+      int lineNum = 1;
+      try {
+        BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
+        String line;
+        Set<Integer> loadedSourceNums = new HashSet<Integer>();
+        while (lineNum < startingLineNum) {
+          reader.readLine();
+          lineNum += 1;
         }
-      }
-    } catch (java.io.IOException e) {
-      throw new RuntimeException(e);
-    }
+        while ((line = reader.readLine()) != null) {
+          JSONObject object = new JSONObject(line);
+          if (object.getString("type").equals("song_text")) {
+            String path = object.getString("path");
+            Matcher matcher = MUSICA_PATH_PATTERN.matcher(path);
+            if (!matcher.matches()) {
+              throw new RuntimeException("Couldn't parse path '" + path + "'");
+            }
+            int sourceNum = Integer.parseInt(matcher.group(1));
+            String songName = object.getString("song_name");
+            if (songName.equals("")) {
+              System.err.println("Skipping " + sourceNum + " because blank");
+            } else if (ESPANOL_PATTERN.matcher(songName).find() ||
+                PORTUGUES_PATTERN.matcher(songName).find() ||
+                INGLES_PATTERN.matcher(songName).find()) {
+              System.err.println("Skipping " + songName + " because name");
+            } else if (loadedSourceNums.contains(sourceNum)) {
+              System.err.println("Skipping " + sourceNum + " because already loaded");
+            } else {
+              loadedSourceNums.add(sourceNum);
 
+              boolean containsPortuguese = false;
+              JSONArray songTextLines = object.getJSONArray("song_text");
+              for (int l = 0; l < songTextLines.length(); l++) {
+                String newLine = songTextLines.getString(l)
+                  .toLowerCase()
+                  .replace('à','á')
+                  .replace('è','é')
+                  .replace('ì','í')
+                  .replace('ò','ó')
+                  .replace('ù','ú')
+                  .replace('ô','ó')
+                  .replace("gûera","güera")
+                  .replace("gûero","güero")
+                  .replace("sueńos","sueños")
+                  .replace("24/7","24 7")
+                  .replace("27/4","24 7")
+                ;
+                if (newLine.contains("ê") || newLine.contains("ã")) {
+                  containsPortuguese = true;
+                }
+                songTextLines.put(l, newLine);
+              }
+
+              int numEnWords = 0;
+              int numEsWords = 0;
+              int numAllWords = 0;
+              for (int l = 0; l < songTextLines.length(); l++) {
+                String lineText = songTextLines.getString(l).trim();
+                for (String word : lineText.split("[^a-zñáéíóúü]+")) {
+                  if (enWords.contains(word)) {
+                    numEnWords += 1;
+                  }
+                  if (esWords.contains(word)) {
+                    numEsWords += 1;
+                  }
+                  numAllWords += 1;
+                }
+              }
+              if (containsPortuguese) {
+                System.err.println("Skipping " + songName +
+                    " because contains portuguese word");
+              } else if (sourceNum == 1822848) {
+                System.err.println("Skipping " + songName +
+                    " (1822848) because it makes analyzer lock up");
+              } else if (numEsWords >= numEnWords && numEsWords > numAllWords / 2) {
+                // Generate lemmas if not done yet
+                File lemmaFile = new File(lemmaDir, "" + sourceNum + ".out");
+                if (!lemmaFile.exists() || lemmaFile.length() == 0) {
+                  System.err.println("Need to create " + lemmaFile);
+                  String[] lemmatizerClientCommand = {
+                    analyzerClientFile.getAbsolutePath(), "3001" };
+                  Process clientChild =
+                    Runtime.getRuntime().exec(lemmatizerClientCommand);
+
+                  BufferedWriter clientWriter = new BufferedWriter(
+                    new OutputStreamWriter(clientChild.getOutputStream()));
+                  for (int l = 0; l < songTextLines.length(); l++) {
+                    String lineText = songTextLines.getString(l).trim();
+                    clientWriter.write(lineText);
+                    clientWriter.write("\n");
+                    clientWriter.flush();
+                  }
+                  clientWriter.close();
+
+                  System.err.println("waiting for client to finish...");
+                  try { clientChild.waitFor(); } catch (InterruptedException e) {}
+
+                  BufferedReader clientErrorReader = new BufferedReader(
+                    new InputStreamReader(clientChild.getErrorStream()));
+                  if (clientErrorReader.ready()) {
+                    String clientErrorLine = clientErrorReader.readLine();
+                    System.err.println("Client error: " + clientErrorLine);
+                    while (clientErrorLine != null) {
+                      System.err.println("Client error: " + clientErrorLine);
+                      clientErrorLine = clientErrorReader.readLine();
+                    }
+                  }
+
+                  BufferedReader clientReader = new BufferedReader(
+                    new InputStreamReader(clientChild.getInputStream()));
+                  BufferedWriter lemmaFileWriter = new BufferedWriter(
+                    new OutputStreamWriter(new FileOutputStream(lemmaFile)));
+                  String line3 = clientReader.readLine();
+                  while (line3 != null) {
+                    lemmaFileWriter.write(line3);
+                    lemmaFileWriter.write("\n");
+                    line3 = clientReader.readLine();
+                  }
+
+                  lemmaFileWriter.close();
+                  System.err.println("Wrote lemmas to " + lemmaFile);
+                }
+
+                try {
+                  processSongText(object, sourceNum, lemmaDir);
+                } catch (RuntimeException e) {
+                  System.err.println("Was on " + jsonFile + " line num " + lineNum +
+                     ", sourceNum = " + sourceNum + ", songName = " + songName);
+                  throw e;
+                }
+              }
+            }
+          }
+          lineNum += 1;
+        }
+      } catch (java.io.IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
 
     Map<String, Integer> word2WordId = new HashMap<String, Integer>();
     int nextWordId = 1;
