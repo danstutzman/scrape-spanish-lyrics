@@ -351,13 +351,15 @@ public class LoadIntoPostgres {
           }
           int sourceNum = Integer.parseInt(matcher.group(1));
           String songName = object.getString("song_name");
-          if (!songName.equals("") &&
-              !ESPANOL_PATTERN.matcher(songName).find() &&
-              !PORTUGUES_PATTERN.matcher(songName).find() &&
-              !INGLES_PATTERN.matcher(songName).find() &&
-              !loadedSourceNums.contains(sourceNum) &&
-new File(lemmaDir, "" + sourceNum + ".out").exists() &&
-new File(lemmaDir, "" + sourceNum + ".out").length() > 0) {
+          if (songName.equals("")) {
+            System.err.println("Skipping " + sourceNum + " because blank");
+          } else if (ESPANOL_PATTERN.matcher(songName).find() ||
+              PORTUGUES_PATTERN.matcher(songName).find() ||
+              INGLES_PATTERN.matcher(songName).find()) {
+            System.err.println("Skipping " + songName + " because name");
+          } else if (loadedSourceNums.contains(sourceNum)) {
+            System.err.println("Skipping " + sourceNum + " because already loaded");
+          } else {
             loadedSourceNums.add(sourceNum);
 
             JSONArray songTextLines = object.getJSONArray("song_text");
