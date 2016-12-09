@@ -25,6 +25,7 @@ end
 
 class LineWord
   attr_accessor :word
+  attr_accessor :song_id
   attr_accessor :line_id
   attr_accessor :begin_index
   attr_accessor :end_index
@@ -34,10 +35,14 @@ end
 lines = []
 songs = []
 word2line_words = {}
-File.open('akwid.txt') do |infile|
+#File.open('julieta.txt') do |infile|
+File.open('a2.txt') do |infile|
+  i = 0
   infile.each_line do |json|
     object = JSON.parse(json)
     if object['type'] == 'song_text'
+      p i if i % 100 == 0
+      i += 1
       song = Song.new(songs.size + 1, object['artist_name'], object['song_name'])
       songs.push song
       next_num_word_in_song = 0
@@ -53,6 +58,7 @@ File.open('akwid.txt') do |infile|
             if char.match /[a-zñáéíóúü]/i
               if current_line_word == nil
                 current_line_word = LineWord.new
+                current_line_word.song_id = song.song_id
                 current_line_word.line_id = line.line_id
                 current_line_word.begin_index = i
                 current_line_word.word = ''
@@ -124,21 +130,24 @@ puts "CREATE INDEX idx_words_word_word ON words(word);"
 puts "DROP TABLE IF EXISTS line_words;
 CREATE TABLE line_words (
   line_id int not null,
+  song_id int not null,
   word_id int not null,
   begin_index smallint not null,
   end_index smallint not null,
   num_word_in_song smallint not null
 );
 COPY line_words FROM STDIN WITH CSV HEADER;
-line_id,word_id,begin_index,end_index,num_word_in_song"
+line_id,song_id,word_id,begin_index,end_index,num_word_in_song"
 word2word_id.each do |word, word_id|
   word2line_words[word].each do |line_word|
-    puts "#{line_word.line_id},#{word_id},#{line_word.begin_index},#{line_word.end_index},#{line_word.num_word_in_song}"
+    puts "#{line_word.line_id},#{line_word.song_id},#{word_id},#{line_word.begin_index},#{line_word.end_index},#{line_word.num_word_in_song}"
   end
 end
 puts "\\."
 
 puts "CREATE INDEX idx_line_words_word_id ON line_words(word_id);"
+puts "CREATE INDEX idx_line_words_song_id_num_word_in_song
+  ON line_words(song_id, num_word_in_song);"
 
 puts "DROP TABLE IF EXISTS songs;
 CREATE TABLE songs (
