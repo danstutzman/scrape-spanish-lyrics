@@ -38,6 +38,12 @@ class LetrasAlphabetSpider(scrapy.Spider):
             long_song_name)
           if match:
             song_name = match.group(1)
+
+            # Bug fix: if song name is bolded (in <b> tag), then extract_first
+            # will chop it off
+            if song_name == '':
+              song_name = a.css('a b::text').extract_first()
+
             yield {
               'type': 'song',
               'path': path,
