@@ -1,6 +1,11 @@
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.util.Arrays;
@@ -311,6 +316,12 @@ public class LoadIntoPostgres {
     }
     File lemmaDir = new File(argv[1]);
 
+    if (argv.length < 3) {
+      System.err.println("Third argument: directory with myfreeling dir");
+      System.exit(1);
+    }
+    File myfreelingParentDir = new File(argv[2]);
+
     System.err.println("Reading words.en.txt...");
     Set<String> enWords = new HashSet<String>();
     try {
@@ -379,7 +390,59 @@ public class LoadIntoPostgres {
               }
             }
             if (numEsWords >= numEnWords && numEsWords > numAllWords / 2) {
-              processSongText(object, sourceNum, lemmaDir);
+              // Generate lemmas if not done yet
+              File lemmaFile = new File(lemmaDir, "" + sourceNum + ".out");
+              if (!lemmaFile.exists() || lemmaFile.length() == 0) {
+                String[] command = {
+                  myfreelingParentDir.getAbsolutePath() +
+                    "/myfreeling/src/main/analyzer", "-f",
+                  myfreelingParentDir.getAbsolutePath() +
+                    "/myfreeling/data/config/es.cfg" };
+                System.err.println("Running " + command[0] + "...");
+                String[] envp = { "FREELINGSHARE=/usr/local/share/freeling" };
+                Process child = Runtime.getRuntime().exec(command, envp);
+
+                BufferedWriter stdinWriter = new BufferedWriter(
+                  new OutputStreamWriter(child.getOutputStream(), "ISO-8859-1"));
+                for (int l = 0; l < songTextLines.length(); l++) {
+                  String lineText = songTextLines.getString(l).trim();
+                  stdinWriter.write(lineText);
+                  stdinWriter.write("\n");
+                }
+                stdinWriter.close();
+
+                BufferedReader stderrReader = new BufferedReader(
+                  new InputStreamReader(child.getErrorStream()));
+                String line2 = stderrReader.readLine();
+                while (line2 != null) {
+                  System.err.println(line2);
+                  line2 = stderrReader.readLine();
+                }
+
+                try {
+                  int exitValue = child.waitFor();
+                  if (exitValue != 0) {
+                    throw new RuntimeException("Non-zero exit value " + exitValue +
+                      " from " + command[0]);
+                  }
+                } catch (InterruptedException e) {
+                  throw new RuntimeException(e);
+                }
+
+                Writer writer = new OutputStreamWriter(
+                  new FileOutputStream(lemmaFile), "UTF-8");
+                BufferedReader analyzerReader = new BufferedReader(
+                  new InputStreamReader(child.getInputStream(), "ISO-8859-1"));
+                String line3 = analyzerReader.readLine();
+                while (line3 != null) {
+                  writer.write(line3);
+                  writer.write("\n");
+                  line3 = analyzerReader.readLine();
+                }
+                writer.close();
+              }
+
+              //processSongText(object, sourceNum, lemmaDir);
             }
           }
         }
