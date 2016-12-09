@@ -38,6 +38,7 @@ public class LoadIntoPostgres {
     int lineId;
     int numLineInSong;
     String text;
+    List<LineWord> lineWords;
   }
 
   class LineWord {
@@ -102,6 +103,7 @@ public class LoadIntoPostgres {
         line.lineId = lines.size() + 1;
         line.numLineInSong = l;
         line.text = lineText;
+        line.lineWords = new ArrayList<LineWord>();
         lines.add(line);
 
         String lineTextLowercase = lineText.toLowerCase();
@@ -127,6 +129,7 @@ public class LoadIntoPostgres {
                 // if there's end punctuation already in this word
                 currentLineWord.endCharPunctuation = i;
                 thisLinesLineWords.add(currentLineWord);
+                line.lineWords.add(currentLineWord);
                 currentLineWord = null;
                 nextNumWordInSong += 1;
 
@@ -147,6 +150,7 @@ public class LoadIntoPostgres {
                 }
                 currentLineWord.endCharPunctuation = i;
                 thisLinesLineWords.add(currentLineWord);
+                line.lineWords.add(currentLineWord);
                 currentLineWord = null;
                 nextNumWordInSong += 1;
               } else {
@@ -176,6 +180,7 @@ public class LoadIntoPostgres {
           }
           currentLineWord.endCharPunctuation = lineTextLowercase.length();
           thisLinesLineWords.add(currentLineWord);
+          line.lineWords.add(currentLineWord);
           currentLineWord = null;
           nextNumWordInSong += 1;
         }
@@ -401,11 +406,24 @@ new File(lemmaDir, "" + sourceNum + ".out").length() > 0) {
     System.out.println("CREATE INDEX idx_songs_song_name ON songs(song_name);");
 
     System.out.println("DROP TABLE IF EXISTS lines;");
-    System.out.println("CREATE TABLE lines (line_id INT NOT NULL, song_id INT NOT NULL, song_source_num INT NOT NULL, num_line_in_song INT NOT NULL, line TEXT NOT NULL);");
+    System.out.println("CREATE TABLE lines (line_id INT NOT NULL, song_id INT NOT NULL, song_source_num INT NOT NULL, num_line_in_song INT NOT NULL, line TEXT NOT NULL, line_words_json TEXT NOT NULL);");
     System.out.println("COPY lines FROM STDIN WITH CSV HEADER;");
-    System.out.println("line_id,song_id,song_source_num,num_line_in_song,line");
+    System.out.println("line_id,song_id,song_source_num,num_line_in_song,line,line_words_json");
     for (Line line : lines) {
-      System.out.println("" + line.lineId + "," + line.songId + "," + songIdToSourceNum.get(line.songId) + "," + line.numLineInSong + ",\"" + line.text.replaceAll("\"", "\"\"") + "\"");
+      JSONArray lineWordsJson = new JSONArray();
+      for (LineWord lineWord : line.lineWords) {
+        JSONObject lineWordJson = new JSONObject();
+        lineWordJson.put("begin_char_punctuation", lineWord.beginCharPunctuation);
+        lineWordJson.put("begin_char_highlight", lineWord.beginCharHighlight);
+        lineWordJson.put("end_char_highlight", lineWord.endCharHighlight);
+        lineWordJson.put("end_char_punctuation", lineWord.endCharPunctuation);
+        lineWordJson.put("num_word_in_song", lineWord.numWordInSong);
+        lineWordJson.put("word_lowercase", lineWord.wordLowercase);
+        lineWordJson.put("part_of_speech", lineWord.partOfSpeech);
+        lineWordJson.put("lemma", lineWord.lemma);
+        lineWordsJson.put(lineWordJson);
+      }
+      System.out.println("" + line.lineId + "," + line.songId + "," + songIdToSourceNum.get(line.songId) + "," + line.numLineInSong + ",\"" + line.text.replaceAll("\"", "\"\"") + "\",\"" + lineWordsJson.toString().replaceAll("\"", "\"\"") + "\"");
     }
     System.out.println("\\.");
     System.out.println("create index idx_lines_line_id on lines(line_id);");
