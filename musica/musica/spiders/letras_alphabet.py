@@ -10,15 +10,22 @@ class LetrasAlphabetSpider(scrapy.Spider):
   def parse(self, response):
     for path in response.css('a::attr("href")').extract():
       #if re.match(r'letras.asp\?g=[A-Z1]$', path):
-      if re.match(r'letras.asp\?g=[A]', path):
-        yield scrapy.Request(response.urljoin(path), self.parse_artists_starting_with)
+      if re.match(r'letras.asp\?g=[Q]', path):
+        yield scrapy.Request(response.urljoin(path) + '&ver=ALL',
+          self.parse_artists_starting_with)
 
   def parse_artists_starting_with(self, response):
     for a in response.css('a'):
-      if len(a.css('b')) == 2:
-        path = a.css('a::attr(href)').extract_first()
-        artist_name = a.css('b:nth-child(2)::text').extract_first()
-        if artist_name == 'Akwid':
+      path = a.css('a::attr(href)').extract_first()
+      if re.match(r'letras.asp\?letras=([0-9]+)', path):
+        if len(a.css('b')) == 2:
+          artist_name = a.css('b:nth-child(2)::text').extract_first()
+        else:
+          artist_name = a.css('a::text').extract_first().strip()
+        #if artist_name == 'Akwid':
+        #if artist_name == 'Julieta Venegas':
+        #if artist_name == 'AC/DC':
+        if artist_name != '':
           yield {
             'type': 'artist',
             'path': path,
