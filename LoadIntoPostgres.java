@@ -400,56 +400,50 @@ public class LoadIntoPostgres {
               // Generate lemmas if not done yet
               File lemmaFile = new File(lemmaDir, "" + sourceNum + ".out");
               if (!lemmaFile.exists() || lemmaFile.length() == 0) {
-                String[] command = {
+                String[] lemmatizerClientCommand = {
                   myfreelingParentDir.getAbsolutePath() +
-                    "/myfreeling/src/main/analyzer", "-f",
-                  myfreelingParentDir.getAbsolutePath() +
-                    "/myfreeling/data/config/es.cfg" };
-                System.err.println("Running " + command[0] + "...");
-                String[] envp = { "FREELINGSHARE=/usr/local/share/freeling" };
-                Process child = Runtime.getRuntime().exec(command, envp);
+                    "/myfreeling/src/main/analyzer_client", "3001" };
+                Process clientChild =
+                  Runtime.getRuntime().exec(lemmatizerClientCommand);
 
-                BufferedWriter stdinWriter = new BufferedWriter(
-                  new OutputStreamWriter(child.getOutputStream(), "ISO-8859-1"));
+                BufferedWriter clientWriter = new BufferedWriter(
+                  new OutputStreamWriter(clientChild.getOutputStream()));
                 for (int l = 0; l < songTextLines.length(); l++) {
                   String lineText = songTextLines.getString(l).trim();
-                  stdinWriter.write(lineText);
-                  stdinWriter.write("\n");
+                  clientWriter.write(lineText);
+                  clientWriter.write("\n");
                 }
-                stdinWriter.close();
+                clientWriter.close();
 
-                BufferedReader stderrReader = new BufferedReader(
-                  new InputStreamReader(child.getErrorStream()));
-                String line2 = stderrReader.readLine();
-                while (line2 != null) {
-                  System.err.println(line2);
-                  line2 = stderrReader.readLine();
-                }
+                try { clientChild.waitFor(); } catch (InterruptedException e) {}
 
-                try {
-                  int exitValue = child.waitFor();
-                  if (exitValue != 0) {
-                    throw new RuntimeException("Non-zero exit value " + exitValue +
-                      " from " + command[0]);
+                BufferedReader clientErrorReader = new BufferedReader(
+                  new InputStreamReader(clientChild.getErrorStream()));
+                if (clientErrorReader.ready()) {
+                  String clientErrorLine = clientErrorReader.readLine();
+                  System.err.println("Client error: " + clientErrorLine);
+                  while (clientErrorLine != null) {
+                    System.err.println("Client error: " + clientErrorLine);
+                    clientErrorLine = clientErrorReader.readLine();
                   }
-                } catch (InterruptedException e) {
-                  throw new RuntimeException(e);
                 }
 
-                Writer writer = new OutputStreamWriter(
-                  new FileOutputStream(lemmaFile), "UTF-8");
-                BufferedReader analyzerReader = new BufferedReader(
-                  new InputStreamReader(child.getInputStream(), "ISO-8859-1"));
-                String line3 = analyzerReader.readLine();
+                BufferedReader clientReader = new BufferedReader(
+                  new InputStreamReader(clientChild.getInputStream()));
+                BufferedWriter lemmaFileWriter = new BufferedWriter(
+                  new OutputStreamWriter(new FileOutputStream(lemmaFile)));
+                String line3 = clientReader.readLine();
                 while (line3 != null) {
-                  writer.write(line3);
-                  writer.write("\n");
-                  line3 = analyzerReader.readLine();
+                  lemmaFileWriter.write(line3);
+                  lemmaFileWriter.write("\n");
+                  line3 = clientReader.readLine();
                 }
-                writer.close();
+
+                lemmaFileWriter.close();
+                System.err.println("Wrote lemmas to " + lemmaFile);
               }
 
-              //processSongText(object, sourceNum, lemmaDir);
+              processSongText(object, sourceNum, lemmaDir);
             }
           }
         }
@@ -457,6 +451,7 @@ public class LoadIntoPostgres {
     } catch (java.io.IOException e) {
       throw new RuntimeException(e);
     }
+
 
     Map<String, Integer> word2WordId = new HashMap<String, Integer>();
     int nextWordId = 1;
