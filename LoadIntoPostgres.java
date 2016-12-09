@@ -204,6 +204,10 @@ public class LoadIntoPostgres {
 
       lastLemmaLineNum += 1;
       String[] lemmaLine = lemmaLines.get(lastLemmaLineNum);
+//if (sourceNum == 1936358) {
+//  System.err.println(lemmaLine[0] + " -> " + lineWord.wordLowercase);
+//}
+
       // Parts of speech starting with F are punctuation-only
       while (lemmaLine[0].equals("") ||
           (lemmaLine[2].startsWith("F") && !lemmaLine[0].equals("etc"))) {
