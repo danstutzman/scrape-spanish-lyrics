@@ -241,6 +241,7 @@ public class LoadIntoPostgres {
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selos") ||
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selas") ||
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "seme") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "sete") ||
             false) {
           lastLemmaLineNum += 2;
         } else if (lineWord.wordLowercase.endsWith("aos") &&
@@ -273,6 +274,12 @@ public class LoadIntoPostgres {
           lastLemmaLineNum -= 1;
         } else if (lemmaWord.equals(lineWord.wordLowercase + ".")) {
           // interpreting mar. (at end of sentence) as abbreviation for marzo
+        } else if (lemmaWord.equals(lineWord.wordLowercase + "ã")) {
+          // probably poorly converted UTF-8 text input
+          lastLemmaLineNum += 1;
+        } else if (lemmaWord.contains("ª")) {
+          // interpreted as ordinal symbol??
+          lastLemmaLineNum -= 1;
         } else {
           throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
         }
