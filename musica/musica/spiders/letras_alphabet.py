@@ -35,6 +35,7 @@ class LetrasAlphabetSpider(scrapy.Spider):
               meta={'artist_name': artist_name})
 
   def parse_songs_by_artist(self, response):
+    path_to_song_name = {}
     artist_name = response.meta['artist_name']
     for a in response.css('a'):
       if a.css('b'):
@@ -50,20 +51,27 @@ class LetrasAlphabetSpider(scrapy.Spider):
             # will chop it off
             if song_name == '':
               song_name = a.css('a b::text').extract_first()
+            path_to_song_name[path] = song_name
 
-            yield {
-              'type': 'song',
-              'path': path,
+    num_translated_songs = sum(1 for name in path_to_song_name.values()
+      if u'espa\xf1ol' in name or u'espanol' in name)
+    if num_translated_songs >= len(path_to_song_name) / 10:
+      print 'Skipping artist %s because %d out of %d songs are translated to Spanish, implying the artist is primarily English language.' % (artist_name, num_translated_songs, len(path_to_song_name))
+    else:
+      for path, song_name in path_to_song_name.items():
+        yield {
+          'type': 'song',
+          'path': path,
+          'artist_name': artist_name,
+          'song_name': song_name,
+        }
+        if True: # song_name == u'Jamás imaginé':
+          yield scrapy.Request(response.urljoin(path), self.parse_song_text,
+            meta={
               'artist_name': artist_name,
               'song_name': song_name,
-            }
-            if True: # song_name == u'Jamás imaginé':
-              yield scrapy.Request(response.urljoin(path), self.parse_song_text,
-                  meta={
-                    'artist_name': artist_name,
-                    'song_name': song_name,
-                    'path': path,
-                  })
+              'path': path,
+            })
 
   def parse_song_text(self, response):
     artist_name = response.meta['artist_name']
