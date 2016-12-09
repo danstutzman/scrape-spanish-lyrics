@@ -205,7 +205,8 @@ public class LoadIntoPostgres {
       lastLemmaLineNum += 1;
       String[] lemmaLine = lemmaLines.get(lastLemmaLineNum);
       // Parts of speech starting with F are punctuation-only
-      while (lemmaLine[0].equals("") || lemmaLine[2].startsWith("F")) {
+      while (lemmaLine[0].equals("") ||
+          (lemmaLine[2].startsWith("F") && !lemmaLine[0].equals("etc"))) {
         lastLemmaLineNum += 1;
         if (lemmaLines.size() <= lastLemmaLineNum) {
           throw new RuntimeException("Ran out of " + lemmaFile.getAbsolutePath());
@@ -242,6 +243,7 @@ public class LoadIntoPostgres {
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "selas") ||
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "seme") ||
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "sete") ||
+            equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "sele") ||
             false) {
           lastLemmaLineNum += 2;
         } else if (lineWord.wordLowercase.endsWith("aos") &&
@@ -264,12 +266,24 @@ public class LoadIntoPostgres {
         } else if (lineWord.wordLowercase.endsWith("onos")) {
           // vamonos -> vamos nos
           lastLemmaLineNum += 1;
-        } else if (lemmaWord.contains("ò") ||
-                   lemmaWord.contains("à") ||
-                   lemmaWord.contains("û") ||
-                   lemmaWord.contains("ä") ||
-                   lemmaWord.contains("è") ||
-                   lemmaWord.contains("º")) {
+        } else if (lemmaWord.contains("ä") ||
+                   lemmaWord.contains("º") ||
+                   lemmaWord.contains("$") ||
+                   lemmaWord.contains("/") ||
+                   lemmaWord.contains("ﬁ") ||
+                   lemmaWord.contains("ç") ||
+                   lemmaWord.contains("\u0441") ||
+                   lemmaWord.contains("â") ||
+                   lemmaWord.contains("ª") ||
+                   lemmaWord.contains("#") ||
+                   lemmaWord.contains("ã") ||
+                   lemmaWord.contains("ù") ||
+                   lemmaWord.contains("+") ||
+                   lemmaWord.contains("ï") ||
+                   lemmaWord.contains("ë") ||
+                   lemmaWord.contains("*") ||
+                   lemmaWord.contains("@") ||
+                   lemmaWord.contains("ℓα")) {
           // backwards accent mark or other unconvertible
           lastLemmaLineNum -= 1;
         } else if (lemmaWord.equals(lineWord.wordLowercase + ".")) {
@@ -277,9 +291,11 @@ public class LoadIntoPostgres {
         } else if (lemmaWord.equals(lineWord.wordLowercase + "ã")) {
           // probably poorly converted UTF-8 text input
           lastLemmaLineNum += 1;
-        } else if (lemmaWord.contains("ª")) {
-          // interpreted as ordinal symbol??
-          lastLemmaLineNum -= 1;
+        } else if (lemmaWord.equals(lineWord.wordLowercase.replace("á", "a")) ||
+                  (lemmaWord.substring(0, lemmaWord.length() - 1) + "os").equals(
+                    lineWord.wordLowercase.replace("á", "a"))) {
+          // interpreted as vestid + os
+          lastLemmaLineNum += 1;
         } else {
           throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
         }
