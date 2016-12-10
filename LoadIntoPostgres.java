@@ -213,7 +213,7 @@ public class LoadIntoPostgres {
 
       // Parts of speech starting with F are punctuation-only
       while (lemmaLine[0].equals("") ||
-          (lemmaLine[2].startsWith("F") && !lemmaLine[0].equals("etc"))) {
+          (lemmaLine[2].startsWith("F") && !(lemmaLine[0].charAt(0) >= 'a' && lemmaLine[0].charAt(0) <= 'z'))) {
         lastLemmaLineNum += 1;
         if (lemmaLines.size() <= lastLemmaLineNum) {
           throw new RuntimeException("Ran out of " + lemmaFile.getAbsolutePath());
