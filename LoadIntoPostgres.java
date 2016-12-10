@@ -288,7 +288,7 @@ public class LoadIntoPostgres {
           // or sucumbíos -> sucumbid
           lastLemmaLineNum += 1;
         } else {
-          throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
+          throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath());
         }
       }
       lineWord.partOfSpeech = lemmaLine[2];
