@@ -283,8 +283,9 @@ public class LoadIntoPostgres {
           lastLemmaLineNum += 1;
         } else if (lemmaWord.equals(lineWord.wordLowercase.replace("á", "a")) ||
                   (lemmaWord.substring(0, lemmaWord.length() - 1) + "os").equals(
-                    lineWord.wordLowercase.replace("á", "a"))) {
+                    lineWord.wordLowercase.replace("á", "a").replace("í", "i"))) {
           // interpreted as vestid + os
+          // or sucumbíos -> sucumbid
           lastLemmaLineNum += 1;
         } else {
           throw new RuntimeException("Expected '" + lineWord.wordLowercase + "' but found '" + lemmaWord + "' in " + lemmaFile.getAbsolutePath() + " line " + lastLemmaLineNum);
