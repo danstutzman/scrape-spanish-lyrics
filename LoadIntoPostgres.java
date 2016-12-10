@@ -253,6 +253,9 @@ public class LoadIntoPostgres {
             equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "sele") ||
             false) {
           lastLemmaLineNum += 2;
+        } else if (equalsIgnoreAccent(lineWord.wordLowercase, lemmaWord + "setelo") ||
+            false) {
+          lastLemmaLineNum += 3;
         } else if (lineWord.wordLowercase.endsWith("aos") &&
             lemmaWord.endsWith("ad")) {
           // jorobaos -> jorobad os?
