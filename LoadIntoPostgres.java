@@ -31,6 +31,9 @@ public class LoadIntoPostgres {
   private static Pattern MUSICA_PATH_PATTERN =
     Pattern.compile("letras.asp\\?letra=([0-9]+)");
 
+  private static Pattern INVALID_CHARS_PATTERN =
+    Pattern.compile("[^a-z0-9ñáéíóúü,.?!:;'\"-]", Pattern.CASE_INSENSITIVE);
+
   class Song {
     int songId;
     int sourceNum;
@@ -270,26 +273,6 @@ public class LoadIntoPostgres {
         } else if (lineWord.wordLowercase.endsWith("onos")) {
           // vamonos -> vamos nos
           lastLemmaLineNum += 1;
-        } else if (lemmaWord.contains("ä") ||
-                   lemmaWord.contains("º") ||
-                   lemmaWord.contains("$") ||
-                   lemmaWord.contains("/") ||
-                   lemmaWord.contains("ﬁ") ||
-                   lemmaWord.contains("ç") ||
-                   lemmaWord.contains("\u0441") ||
-                   lemmaWord.contains("â") ||
-                   lemmaWord.contains("ª") ||
-                   lemmaWord.contains("#") ||
-                   lemmaWord.contains("ã") ||
-                   lemmaWord.contains("ù") ||
-                   lemmaWord.contains("+") ||
-                   lemmaWord.contains("ï") ||
-                   lemmaWord.contains("ë") ||
-                   lemmaWord.contains("*") ||
-                   lemmaWord.contains("@") ||
-                   lemmaWord.contains("ℓα")) {
-          // backwards accent mark or other unconvertible
-          lastLemmaLineNum -= 1;
         } else if (lemmaWord.equals(lineWord.wordLowercase + ".")) {
           // interpreting mar. (at end of sentence) as abbreviation for marzo
         } else if (lemmaWord.equals(lineWord.wordLowercase + "ã")) {
@@ -408,22 +391,36 @@ public class LoadIntoPostgres {
               JSONArray songTextLines = object.getJSONArray("song_text");
               for (int l = 0; l < songTextLines.length(); l++) {
                 String newLine = songTextLines.getString(l)
-                  .toLowerCase()
+                  .toLowerCase();
+                if (newLine.contains("ê") || newLine.contains("ã")) {
+                  containsPortuguese = true;
+                }
+                newLine = newLine
                   .replace('à','á')
                   .replace('è','é')
                   .replace('ì','í')
                   .replace('ò','ó')
                   .replace('ù','ú')
                   .replace('ô','ó')
-                  .replace("gûera","güera")
-                  .replace("gûero","güero")
-                  .replace("sueńos","sueños")
-                  .replace("24/7","24 7")
-                  .replace("27/4","24 7")
+                  .replace('û','ü')
+                  .replace('ń','ñ')
+                  .replace('ä','a')
+                  .replace('ç','c')
+                  .replace('\u0441','c')
+                  .replace('â','a')
+                  .replace('ã','a')
+                  .replace('ù','u')
+                  .replace('ï','i')
+                  .replace('ë','e')
+                  .replace("ℓα","la")
+                  .replace('ý','y')
+                  .replace("œ","oe")
+                  .replace('°','o')
+                  .replace('û','u')
+                  .replace('ö', 'o')
+                  .replace('î', 'i')
                 ;
-                if (newLine.contains("ê") || newLine.contains("ã")) {
-                  containsPortuguese = true;
-                }
+                newLine = INVALID_CHARS_PATTERN.matcher(newLine).replaceAll(" ");
                 songTextLines.put(l, newLine);
               }
 
